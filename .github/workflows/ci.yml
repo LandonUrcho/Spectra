@@ -8,10 +8,11 @@ on:
 permissions:
   contents: read
 
-# Cancel superseded runs on the same PR or branch
+# Cancel superseded runs on a PR. Runs on main always finish: Vercel deploys every commit
+# there, so each one should get a CI result.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
