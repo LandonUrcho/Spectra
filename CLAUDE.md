@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 Spectra is a CVE dashboard. Pick a vendor (e.g. Cisco, VMware, Palo Alto) and it shows the vendor's products, each product's CVEs (paginated), and a donut chart of CVSS severity. It has two independent parts:
 
-- `cve-backend/`: a single-file FastAPI app (`main.py`). There is no requirements file. It needs `fastapi`, `uvicorn` and `requests`, installed in `cve-backend/.venv`. On this machine bare `python` can resolve to the Microsoft Store stub, so use `.venv/Scripts/python.exe`.
+- `cve-backend/`: a single-file FastAPI app (`main.py`). Dependencies are in `requirements.txt` (`fastapi`, `uvicorn`, `requests`), installed in `cve-backend/.venv`. On this machine bare `python` can resolve to the Microsoft Store stub, so use `.venv/Scripts/python.exe`.
 - `cve-frontend/`: React 19, TypeScript, Vite 8 and Tailwind v4 (via `@tailwindcss/postcss`; `tailwind.config.js` is a v3 leftover and isn't used). Fonts are self-hosted through `@fontsource` (Inter, JetBrains Mono). There's no chart library.
 
 There are no tests in either part.
@@ -39,5 +39,12 @@ Frontend (from `cve-frontend/`):
   - Request state is keyed by `vendor#attempt` rather than set synchronously inside effects, because eslint-plugin-react-hooks v7 flags `set-state-in-effect`.
   - Design tokens (surfaces, text, accent, severity colors) live in `@theme` in `src/index.css`. Use them as utilities (`bg-surface`, `border-line`, `text-muted`) instead of raw hex values.
   - The style is deliberately restrained: no glows, gradients, animations or uppercase tracking.
-- **CORS:** the backend only allows `http://localhost:5173`. If the frontend port or host changes, update `allow_origins` in `main.py`.
-- `cve-backend/server.*.log` are local run logs, not source.
+- **CORS:** `http://localhost:5173` is always allowed. Deployed frontends go in the `ALLOWED_ORIGINS` env var (comma-separated exact origins, lowercased and trailing slashes stripped). `ALLOWED_ORIGIN_REGEX` can match Vercel preview URLs; anchor it on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex makes the app refuse to start with a clear error.
+- `cve-backend/venv/`, `.venv/`, `__pycache__/` and `server.*.log` are gitignored local files, not source.
+
+## Deployment (Vercel)
+Two Vercel projects from this repo:
+- **Backend:** Root Directory `cve-backend`. Vercel detects the FastAPI `app` in `main.py` and installs `requirements.txt`. Env vars: `ALLOWED_ORIGINS` (the frontend URL), optional `ALLOWED_ORIGIN_REGEX`.
+- **Frontend:** Root Directory `cve-frontend`, Vite preset. Env var: `VITE_API_URL` = backend URL (trailing slashes are stripped). It's baked in at build time, so redeploy after changing it. Only `npm run dev` falls back to `http://localhost:8000`; a production build without it shows a "no API URL" error.
+- `requirements.txt` is pinned to the versions tested locally. Bump them deliberately.
+- The 10-minute cache is per serverless instance, so cold instances refetch from CIRCL.
