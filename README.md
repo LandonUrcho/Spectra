@@ -69,7 +69,7 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 
 [`docs/PLAN.md`](docs/PLAN.md) is the full upgrade plan, split into small PRs. Each one can be merged and deployed on its own, and each design decision lists the alternatives considered.
 
-- [ ] **0. Tooling:** linting, formatting, starter tests, GitHub Actions CI (in progress)
+- [x] **0. Tooling:** linting, formatting, starter tests, GitHub Actions CI
 - [ ] **1. Backend foundation:** modular FastAPI app, async HTTP, Pydantic models, honest errors, structured logging
 - [ ] **2. Frontend foundation:** React Router, TanStack Query, generated API types, app shell, light/dark themes
 - [ ] **3. Data layer:** Postgres (Neon), Redis (Upstash), stale-if-error caching, rate limits
@@ -87,6 +87,7 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 | Backend | Python, FastAPI, Uvicorn, Requests |
 | Data | CIRCL Vulnerability-Lookup API (CVE JSON 5 records) |
 | Hosting | Vercel: a static frontend plus a Python serverless function, both deployed from `main` |
+| Quality | ruff, mypy and pytest; ESLint, Prettier, and Vitest with Testing Library; GitHub Actions CI and Dependabot |
 
 ## Running locally
 
@@ -104,6 +105,16 @@ python main.py
 
 > On Windows, if `python` opens the Microsoft Store, use `py -m venv .venv`. Then run the app with `.venv\Scripts\python.exe main.py`.
 
+To run the backend checks, install the dev tools as well:
+
+```bash
+pip install -r requirements-dev.txt
+pytest             # unit tests; add --cov for coverage
+ruff check .       # lint
+ruff format .      # format
+mypy               # type-check
+```
+
 **Frontend** (http://localhost:5173):
 
 ```bash
@@ -112,7 +123,11 @@ npm install
 npm run dev        # dev server; calls the backend at http://localhost:8000
 npm run build      # type-checks, then builds for production
 npm run lint
+npm test           # unit tests; npm run test:watch keeps watching
+npm run format     # format with Prettier
 ```
+
+CI runs all of these checks on every pull request and every push to `main`.
 
 ### Environment variables
 
@@ -121,6 +136,8 @@ npm run lint
 | `ALLOWED_ORIGINS` | backend | Comma-separated frontend origins allowed by CORS. `http://localhost:5173` is always allowed. |
 | `ALLOWED_ORIGIN_REGEX` | backend | Optional regex for Vercel preview URLs. Anchor it on your team slug. |
 | `VITE_API_URL` | frontend, at build time | The backend's base URL. Required for production builds. |
+
+[`.env.example`](.env.example) describes each one in more detail.
 
 ## API
 
@@ -165,7 +182,9 @@ Every push to `main` deploys both projects.
 ```
 cve-backend/
   main.py            FastAPI app: vendor resolution, CIRCL client, CVE normalization, cache
-  requirements.txt   pinned dependencies
+  requirements.txt   pinned runtime dependencies (dev tools are in requirements-dev.txt)
+  pyproject.toml     ruff, mypy and pytest config
+  tests/             pytest unit tests
 cve-frontend/
   src/
     App.tsx          state and layout
@@ -174,6 +193,8 @@ cve-frontend/
     components/      TopBar, VendorSummary, ProductList, ProductDetail, CveTable, …
 docs/
   PLAN.md            phased upgrade plan with design decisions
+.github/
+  workflows/ci.yml   lint, format, type-check, test and build checks
 ```
 
 ## Credits

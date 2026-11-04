@@ -328,7 +328,7 @@ cve-backend/{pyproject.toml (ruff, mypy, pytest config), requirements-dev.txt}
 - **Observability:** JSON structured logging, a request-ID middleware (`X-Request-ID`), and a `Server-Timing` header.
 - **Tests:** `pytest` + `respx` with recorded CIRCL fixtures. Cover the parsing helpers, 404/502/stale paths, and vendor resolution. *(pytest setup and the parsing-helper tests done in PR 0; `respx`, fixtures, the API paths and vendor resolution remain.)*
 - **CI:** `.github/workflows/ci.yml` with a backend job that runs `ruff check`, `ruff format --check`, `mypy app`, and `pytest --cov`. Add `.github/dependabot.yml` for pip, npm and github-actions. *(Done in PR 0. mypy checks the paths in `pyproject.toml`'s `files` (today `main.py` and `tests`), so add `app` there; the config is lenient and can be tightened as the code gets typed.)*
-- **Docs:** root `README.md` skeleton (pitch, live links, stack, local setup), `LICENSE` (MIT), `.env.example`. Fix the stale `CLAUDE.md` line 6 (donut chart and pagination no longer exist). *(`LICENSE`, `.env.example` and the `CLAUDE.md` fix done in PR 0; the README skeleton remains.)*
+- **Docs:** root `README.md` skeleton (pitch, live links, stack, local setup), `LICENSE` (MIT), `.env.example`. Fix the stale `CLAUDE.md` line 6 (donut chart and pagination no longer exist). *(`LICENSE`, `.env.example` and the `CLAUDE.md` fix done in PR 0. The root `README.md` was added in its own docs PR; update it for what this PR changes.)*
 
 ## PR 2 — Frontend foundation and app shell
 
