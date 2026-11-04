@@ -28,9 +28,7 @@ Frontend (from `cve-frontend/`):
 - `npm test`: runs Vitest once. `npm run test:watch` keeps it running; `npx vitest run src/severity.test.ts` runs one file.
 - `npm run format` and `npm run format:check`: Prettier
 
-CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`:
-- backend on Python 3.12, Vercel's default: ruff check, ruff format --check, mypy, pytest --cov
-- frontend on Node 24: npm ci, lint, format:check, `tsc -b`, vitest run, build
+CI (`.github/workflows/ci.yml`) runs the lint, format, type-check, test and build commands above on pull requests and pushes to `main`, on Python 3.12 (Vercel's default) and Node 24. Run them before pushing.
 
 Dependabot (`.github/dependabot.yml`) opens weekly update PRs for pip, npm and GitHub Actions.
 

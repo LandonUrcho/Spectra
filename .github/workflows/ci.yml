@@ -74,7 +74,7 @@ jobs:
         run: npx tsc -b
 
       - name: Test
-        run: npx vitest run
+        run: npm test
 
       - name: Build
         run: npm run build
