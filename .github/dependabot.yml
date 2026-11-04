@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /cve-backend
+    schedule:
+      interval: weekly
+    groups:
+      # One PR for routine bumps; majors still get their own PRs. Formatters stay out of
+      # the group: a new release can change their output, and the reformat belongs in its
+      # own PR rather than blocking every other update.
+      pip-minor-and-patch:
+        update-types: [minor, patch]
+        exclude-patterns: [ruff]
+
+  - package-ecosystem: npm
+    directory: /cve-frontend
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+        exclude-patterns: [prettier]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -304,8 +304,10 @@ cve-backend/tests/{conftest.py, fixtures/*.json, test_parsing.py, test_vendor_ap
 cve-backend/{pyproject.toml (ruff, mypy, pytest config), requirements-dev.txt}
 ```
 
+*Done in PR 0:* `pyproject.toml`, `requirements-dev.txt` and a first `tests/test_parsing.py`. The tests import the helpers from `main`, so point them at the new module after the move. `pyproject.toml` has no `[project]` table on purpose, and `cve-backend/.vercelignore` keeps it out of the Vercel deployment, because Vercel's Python builder prefers `pyproject.toml` over `requirements.txt`. If dependencies move into `pyproject.toml` in this PR, drop that `.vercelignore` line.
+
 **Moves and replacements:**
-- Move the pure helpers out of `main.py` unchanged first, then add tests for them: `extract_score`, `extract_summary`, `belongs_to_vendor`, `display_name`, `resolve_vendor`, `_quote`.
+- Move the pure helpers out of `main.py` unchanged first, then add tests for them: `extract_score`, `extract_summary`, `belongs_to_vendor`, `display_name`, `resolve_vendor`, `_quote`. *(Tests for the first four done in PR 0, against `main.py` as it is; the move and tests for `resolve_vendor` and `_quote` remain.)*
 - Replace `requests` and the `ThreadPoolExecutor` with one shared **`httpx.AsyncClient`**:
   - timeouts;
   - retries with exponential backoff on 5xx errors and timeouts;
@@ -324,9 +326,9 @@ cve-backend/{pyproject.toml (ruff, mypy, pytest config), requirements-dev.txt}
   - `GET /api/vendors?q=`: autocomplete, proxying CIRCL browse with a cache.
   - `GET /api/vendors/{vendor}`: the same payload as today plus `stale` and `fetched_at`.
 - **Observability:** JSON structured logging, a request-ID middleware (`X-Request-ID`), and a `Server-Timing` header.
-- **Tests:** `pytest` + `respx` with recorded CIRCL fixtures. Cover the parsing helpers, 404/502/stale paths, and vendor resolution.
-- **CI:** `.github/workflows/ci.yml` with a backend job that runs `ruff check`, `ruff format --check`, `mypy app`, and `pytest --cov`. Add `.github/dependabot.yml` for pip, npm and github-actions.
-- **Docs:** root `README.md` skeleton (pitch, live links, stack, local setup), `LICENSE` (MIT), `.env.example`. Fix the stale `CLAUDE.md` line 6 (donut chart and pagination no longer exist).
+- **Tests:** `pytest` + `respx` with recorded CIRCL fixtures. Cover the parsing helpers, 404/502/stale paths, and vendor resolution. *(pytest setup and the parsing-helper tests done in PR 0; `respx`, fixtures, the API paths and vendor resolution remain.)*
+- **CI:** `.github/workflows/ci.yml` with a backend job that runs `ruff check`, `ruff format --check`, `mypy app`, and `pytest --cov`. Add `.github/dependabot.yml` for pip, npm and github-actions. *(Done in PR 0. mypy checks the paths in `pyproject.toml`'s `files` (today `main.py` and `tests`), so add `app` there; the config is lenient and can be tightened as the code gets typed.)*
+- **Docs:** root `README.md` skeleton (pitch, live links, stack, local setup), `LICENSE` (MIT), `.env.example`. Fix the stale `CLAUDE.md` line 6 (donut chart and pagination no longer exist). *(`LICENSE`, `.env.example` and the `CLAUDE.md` fix done in PR 0. The root `README.md` was added in its own docs PR; update it for what this PR changes.)*
 
 ## PR 2 — Frontend foundation and app shell
 
@@ -352,9 +354,9 @@ cve-backend/{pyproject.toml (ruff, mypy, pytest config), requirements-dev.txt}
   - Add a skip link.
   - Wrap the app in a React error boundary.
   - Lazy-load the route chunks.
-- **Cleanup:** delete the unused `tailwind.config.js` and the redundant `autoprefixer`, and replace the boilerplate `cve-frontend/README.md` with a pointer to the root README.
-- **Tests:** Vitest + Testing Library + MSW for components and hooks (`CveTable` sort, severity bands, search keyboard behavior). Add Prettier.
-- **CI:** a frontend job that runs `npm ci`, lint, `tsc -b`, `vitest run`, build, and the OpenAPI drift check.
+- **Cleanup:** delete the unused `tailwind.config.js` and the redundant `autoprefixer`, and replace the boilerplate `cve-frontend/README.md` with a pointer to the root README. *(Both deletions done in PR 0; the README pointer remains.)*
+- **Tests:** Vitest + Testing Library + MSW for components and hooks (`CveTable` sort, severity bands, search keyboard behavior). Add Prettier. *(Prettier, Vitest + Testing Library + jsdom, the severity-band tests and a `SeverityBadge` render test done in PR 0; MSW, `CveTable` sort and search keyboard tests remain.)*
+- **CI:** a frontend job that runs `npm ci`, lint, `tsc -b`, `vitest run`, build, and the OpenAPI drift check. *(Done in PR 0, plus `format:check`, except the OpenAPI drift check, which remains.)*
 
 ## PR 3 — Data layer: Postgres, Redis, caching, rate limits
 
