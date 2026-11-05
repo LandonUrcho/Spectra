@@ -46,6 +46,15 @@ jobs:
       - name: Test
         run: pytest --cov
 
+      # The frontend's types are generated from this file, so it must match the code
+      - name: Check the OpenAPI schema is up to date
+        run: |
+          python -m scripts.export_openapi
+          git diff --exit-code ../cve-frontend/openapi.json || {
+            echo "::error::cve-frontend/openapi.json is out of date. Run 'python -m scripts.export_openapi' in cve-backend and commit it."
+            exit 1
+          }
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -75,6 +84,14 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Check the generated API types are up to date
+        run: |
+          npm run gen:api
+          git diff --exit-code src/api/schema.d.ts || {
+            echo "::error::src/api/schema.d.ts is out of date. Run 'npm run gen:api' in cve-frontend and commit it."
+            exit 1
+          }
 
       - name: Build
         run: npm run build

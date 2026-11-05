@@ -12,11 +12,14 @@ I wanted to build an app that showcases the vulnerabilities in products from the
 
 ## What it does
 
-- **Look up any vendor.** Type a name (`fortinet`, `cisco`, `vmware`) or pick a preset. Spectra matches it to the vendor's official name in CIRCL, so `palo alto` becomes *Palo Alto Networks*.
+- **Look up any vendor.** Type a name (`fortinet`, `cisco`, `vmware`) and pick from the suggestions, or pick a preset. Spectra matches it to the vendor's official name in CIRCL, so `palo alto` becomes *Palo Alto Networks*.
 - **See the products with recent CVEs first.** It checks the vendor's most recently updated products and shows those with the most CVEs, each with a severity bar.
 - **Read a product's CVEs.** Each CVE shows its CVSS score and version, publish date and description. The table sorts by score or date, and descriptions expand in place. Every CVE ID links to its full record on CIRCL.
 - **Get the summary at a glance.** The page shows the number of products and CVEs, how many are critical, and the highest CVSS score.
-- **Use it from the keyboard.** `/` focuses search, the arrow keys move through the product list, and the table headers support screen readers.
+- **Share what you're looking at.** Every vendor and product has its own URL (`/vendors/cisco/IOS XE`), so views can be bookmarked and shared, and the back button works.
+- **See how it works.** The Methodology page explains where the data comes from, how severity is graded, and what CVSS doesn't tell you.
+- **Light or dark.** It follows your system theme, and the toggle in the top bar remembers your choice.
+- **Use it from the keyboard.** `/` or `⌘K` focuses search, the arrow keys move through the product list, and the table headers support screen readers.
 
 ## How it works
 
@@ -44,13 +47,14 @@ Results are cached in memory for 10 minutes. If CIRCL is down after that, the AP
 
 - **Vendor resolution is generic.** No vendor needs special-case code: any vendor CIRCL knows about works.
 - **Errors are honest.** An unknown vendor is a `404`, CIRCL being down is a `502` (or stale data), and invalid input is a `422`. The API never passes off sample data as live.
-- **The API contract is typed.** Every route declares a Pydantic response model, so the OpenAPI schema at `/docs` is exact. The frontend will generate its types from it.
+- **The API contract is typed end to end.** Every route declares a Pydantic response model, so the OpenAPI schema is exact. The frontend's types are generated from that schema, and CI fails if the schema or the generated types fall out of date.
 - **Requests are traceable.** Every response carries an `X-Request-ID`, every log line is JSON tagged with that ID, and a `Server-Timing` header shows the total time and the time spent waiting on CIRCL in the browser's network panel.
 - **It's polite to CIRCL.** Concurrent requests for the same vendor share one upstream lookup instead of each fanning out to ~17 CIRCL calls, and each client IP gets 60 vendor requests a minute (then `429` with `Retry-After`).
 - **CORS is configured from the environment.** Exact origins come from `ALLOWED_ORIGINS`. Vercel preview URLs can be allowed through `ALLOWED_ORIGIN_REGEX`, which should be anchored on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex stops the app at startup instead of silently allowing nothing.
 - **Production builds fail loudly.** If `VITE_API_URL` isn't set, the app shows a clear "no API URL" error instead of quietly calling `localhost`.
 - **Theming uses design tokens.** Colors for surfaces, text and severity live in Tailwind v4's `@theme`, and components use them as utilities, never raw hex values.
 - **Accessibility is built in:**
+  - a "Skip to content" link, and text that meets WCAG AA contrast (4.5:1) in both themes;
   - the search form has a real label and `role="search"`;
   - preset buttons use `aria-pressed`;
   - the product list supports arrow-key navigation;
@@ -65,7 +69,7 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 |---|---|
 | The cache lives in each serverless instance, so a cold instance refetches from CIRCL. | A shared Redis cache with request coalescing (PR 3) |
 | CVEs are ranked by CVSS severity only. | Priority from CISA KEV and FIRST EPSS exploitation data (PR 4) |
-| There are no URL routes, so views can't be bookmarked or shared. | React Router deep links and a CVE detail drawer (PRs 2 and 5) |
+| CVEs don't have pages of their own. | A CVE detail drawer with its own URL (PR 5) |
 | Each product shows at most 10 CVEs. | Pagination (PR 3) |
 
 ## Roadmap
@@ -86,11 +90,11 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 
 | Layer | Tools |
 |---|---|
-| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, self-hosted Inter and JetBrains Mono |
+| Frontend | React 19, TypeScript, Vite 8, React Router, TanStack Query, Tailwind CSS v4, self-hosted Inter and JetBrains Mono |
 | Backend | Python 3.11+, FastAPI, Pydantic and pydantic-settings, httpx, Uvicorn |
 | Data | CIRCL Vulnerability-Lookup API (CVE JSON 5 records) |
 | Hosting | Vercel: a static frontend plus a Python serverless function, both deployed from `main` |
-| Quality | ruff, mypy and pytest; ESLint, Prettier, and Vitest with Testing Library; GitHub Actions CI and Dependabot |
+| Quality | ruff, mypy (strict), pytest and respx; ESLint, Prettier, Vitest, Testing Library and MSW; GitHub Actions CI and Dependabot |
 
 ## Running locally
 
@@ -116,6 +120,7 @@ pytest             # unit tests; add --cov for coverage
 ruff check .       # lint
 ruff format .      # format
 mypy               # type-check
+python -m scripts.export_openapi   # after changing the API: update cve-frontend/openapi.json
 ```
 
 **Frontend** (http://localhost:5173):
@@ -128,6 +133,7 @@ npm run build      # type-checks, then builds for production
 npm run lint
 npm test           # unit tests; npm run test:watch keeps watching
 npm run format     # format with Prettier
+npm run gen:api    # regenerate src/api/schema.d.ts from openapi.json
 ```
 
 CI runs all of these checks on every pull request and every push to `main`.
@@ -187,7 +193,7 @@ The app runs as two Vercel projects from this one repository:
 | Project | Root directory | Settings |
 |---|---|---|
 | Backend | `cve-backend` | Vercel detects the FastAPI `app` in `main.py`. Set `ALLOWED_ORIGINS` to the frontend URL. |
-| Frontend | `cve-frontend` | Use the Vite preset. Set `VITE_API_URL` to the backend URL, then redeploy after changing it, because the value is baked in at build time. |
+| Frontend | `cve-frontend` | Use the Vite preset. Set `VITE_API_URL` to the backend URL, then redeploy after changing it, because the value is baked in at build time. `vercel.json` sends every path to `index.html` so deep links work. |
 
 Every push to `main` deploys both projects.
 
@@ -207,9 +213,11 @@ cve-backend/
   pyproject.toml     ruff, mypy and pytest config
   tests/             pytest tests, with hand-written CIRCL fixtures in tests/fixtures/
 cve-frontend/
+  openapi.json       the API's schema, exported by cve-backend/scripts/export_openapi.py
   src/
-    App.tsx          state and layout
-    api.ts           response types and fetch client
+    routes.tsx       URL routes; Layout.tsx is the shared frame
+    pages/           vendor dashboard, methodology, watchlist, not-found and error pages
+    api/             typed API client; schema.d.ts is generated from ../openapi.json
     severity.ts      CVSS severity bands
     components/      TopBar, VendorSummary, ProductList, ProductDetail, CveTable, …
 docs/
