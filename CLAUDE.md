@@ -10,7 +10,7 @@ Spectra is a CVE dashboard. Pick a vendor (e.g. Cisco, VMware, Palo Alto) and it
 
 Tests never touch the network:
 - Backend tests live in `cve-backend/tests/` (pytest). `respx` intercepts every request to CIRCL, and `tests/fixtures/` holds hand-written CIRCL responses. `conftest.py` builds a fresh app per test with `create_app()`, a `CirclClient` without backoff delays, and a fake clock for cache expiry. Async tests use the anyio pytest plugin (`pytestmark = pytest.mark.anyio`). Warnings fail the tests.
-- Frontend tests sit next to the source as `*.test.ts(x)` (Vitest, Testing Library, jsdom). `src/test/setup.ts` unmounts rendered components after each test.
+- Frontend tests sit next to the source as `*.test.ts(x)` (Vitest, Testing Library, jsdom). `src/test/setup.ts` unmounts rendered components after each test. Tests stub `fetch` with `vi.stubGlobal`; `src/routes.test.tsx` renders the real routes in a memory router with a fresh `QueryClient` (no retries).
 
 ## Commands
 Backend (from `cve-backend/`):
@@ -55,12 +55,15 @@ Dependabot (`.github/dependabot.yml`) opens weekly update PRs for pip, npm and G
   3. fetches `/vulnerability/search/{vendor}/{product}` for each product concurrently. A failed product is skipped; if all fail, it's an `UpstreamError`.
   - Records are in CVE JSON 5 format. The score comes from `containers.cna.metrics` (or the `adp` metrics) and prefers CVSS 3.1. `belongs_to_vendor` drops other vendors' CVEs, which the search sometimes returns. Display names come from `cna.affected[].product`.
   - Results are cached for 10 minutes. After that, if CIRCL fails, the last good copy is served with `stale: true`; with nothing cached it's a 502. Vendor suggestions get the same fallback (without a flag). There's no sample data any more.
-- **Frontend:** a single-screen master-detail dashboard. The top bar has vendor search plus presets, then a vendor summary, then the product list (left) and the selected product's CVE table (right).
+- **Frontend:** a master-detail dashboard behind React Router (library mode, `createBrowserRouter`) and TanStack Query.
+  - `src/routes.tsx`: `/` redirects to `/vendors/palo%20alto` (until the overview page in roadmap PR 7); `/vendors/:vendor/:product?` (one route, optional product) renders `pages/VendorPage.tsx`, lazy-loaded as its own chunk; `*` renders `pages/NotFoundPage.tsx`; `pages/RouteError.tsx` is the error boundary. `src/paths.ts` builds the URLs.
+  - `src/Layout.tsx` renders the top bar (vendor search plus presets) above the routed page. Searching pushes a history entry; selecting a product replaces the current one, so arrowing through the product list doesn't flood the history.
+  - Server state goes through TanStack Query (`src/api/useVendor.ts`, query key `["vendor", name]`); `src/main.tsx` sets 5-minute staleness, one retry and no refetch on focus. Don't fetch in `useEffect`.
+  - `cve-frontend/vercel.json` rewrites every path to `index.html`, so deep links work on Vercel.
   - `src/api/index.ts` holds `fetchVendor` (an `openapi-fetch` client for `GET /api/vendors/{vendor}`) and re-exports the response types from the generated `src/api/schema.d.ts`; never edit that file or `openapi.json` by hand. `fetchVendor` returns `null` for a 404 and throws a readable error otherwise. The base URL comes from `VITE_API_URL` and defaults to `http://localhost:8000`.
   - The vendor summary badge shows "Live" or, when the backend served its last good copy, "Cached" (`stale: true`).
   - `src/severity.ts` defines the CVSS bands and their colors.
-  - `src/App.tsx` owns the state and layout; `src/components/` holds the presentational pieces.
-  - Request state is keyed by `vendor#attempt` rather than set synchronously inside effects, because eslint-plugin-react-hooks v7 flags `set-state-in-effect`.
+  - `src/components/` holds the presentational pieces.
   - Design tokens (surfaces, text, accent, severity colors) live in `@theme` in `src/index.css`. Use them as utilities (`bg-surface`, `border-line`, `text-muted`) instead of raw hex values.
   - The style is deliberately restrained: no glows, gradients, animations or uppercase tracking.
 - **CORS:** `http://localhost:5173` is always allowed, and `GET` and `POST` are allowed methods (POST is for the AI explainer in roadmap PR 6). `X-Request-ID` is exposed to the browser. Deployed frontends go in the `ALLOWED_ORIGINS` env var (comma-separated exact origins, lowercased and trailing slashes stripped). `ALLOWED_ORIGIN_REGEX` can match Vercel preview URLs; anchor it on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex makes the app refuse to start with a clear error.
