@@ -12,7 +12,7 @@ I wanted to build an app that showcases the vulnerabilities in products from the
 
 ## What it does
 
-- **Look up any vendor.** Type a name (`fortinet`, `cisco`, `vmware`) or pick a preset. Spectra matches it to the vendor's official name in CIRCL, so `palo alto` becomes *Palo Alto Networks*.
+- **Look up any vendor.** Type a name (`fortinet`, `cisco`, `vmware`) and pick from the suggestions, or pick a preset. Spectra matches it to the vendor's official name in CIRCL, so `palo alto` becomes *Palo Alto Networks*.
 - **See the products with recent CVEs first.** It checks the vendor's most recently updated products and shows those with the most CVEs, each with a severity bar.
 - **Read a product's CVEs.** Each CVE shows its CVSS score and version, publish date and description. The table sorts by score or date, and descriptions expand in place. Every CVE ID links to its full record on CIRCL.
 - **Get the summary at a glance.** The page shows the number of products and CVEs, how many are critical, and the highest CVSS score.
