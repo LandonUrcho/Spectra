@@ -17,6 +17,7 @@ I wanted to build an app that showcases the vulnerabilities in products from the
 - **Read a product's CVEs.** Each CVE shows its CVSS score and version, publish date and description. The table sorts by score or date, and descriptions expand in place. Every CVE ID links to its full record on CIRCL.
 - **Get the summary at a glance.** The page shows the number of products and CVEs, how many are critical, and the highest CVSS score.
 - **Share what you're looking at.** Every vendor and product has its own URL (`/vendors/cisco/IOS XE`), so views can be bookmarked and shared, and the back button works.
+- **Light or dark.** It follows your system theme, and the toggle in the top bar remembers your choice.
 - **Use it from the keyboard.** `/` focuses search, the arrow keys move through the product list, and the table headers support screen readers.
 
 ## How it works
@@ -51,6 +52,7 @@ Results are cached in memory for 10 minutes. If CIRCL is down after that, the AP
 - **Production builds fail loudly.** If `VITE_API_URL` isn't set, the app shows a clear "no API URL" error instead of quietly calling `localhost`.
 - **Theming uses design tokens.** Colors for surfaces, text and severity live in Tailwind v4's `@theme`, and components use them as utilities, never raw hex values.
 - **Accessibility is built in:**
+  - a "Skip to content" link, and text that meets WCAG AA contrast (4.5:1) in both themes;
   - the search form has a real label and `role="search"`;
   - preset buttons use `aria-pressed`;
   - the product list supports arrow-key navigation;
