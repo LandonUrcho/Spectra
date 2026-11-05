@@ -44,7 +44,7 @@ Results are cached in memory for 10 minutes. If CIRCL is down after that, the AP
 
 - **Vendor resolution is generic.** No vendor needs special-case code: any vendor CIRCL knows about works.
 - **Errors are honest.** An unknown vendor is a `404`, CIRCL being down is a `502` (or stale data), and invalid input is a `422`. The API never passes off sample data as live.
-- **The API contract is typed.** Every route declares a Pydantic response model, so the OpenAPI schema at `/docs` is exact. The frontend will generate its types from it.
+- **The API contract is typed end to end.** Every route declares a Pydantic response model, so the OpenAPI schema is exact. The frontend's types are generated from that schema, and CI fails if the schema or the generated types fall out of date.
 - **Requests are traceable.** Every response carries an `X-Request-ID`, every log line is JSON tagged with that ID, and a `Server-Timing` header shows the total time and the time spent waiting on CIRCL in the browser's network panel.
 - **CORS is configured from the environment.** Exact origins come from `ALLOWED_ORIGINS`. Vercel preview URLs can be allowed through `ALLOWED_ORIGIN_REGEX`, which should be anchored on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex stops the app at startup instead of silently allowing nothing.
 - **Production builds fail loudly.** If `VITE_API_URL` isn't set, the app shows a clear "no API URL" error instead of quietly calling `localhost`.
@@ -115,6 +115,7 @@ pytest             # unit tests; add --cov for coverage
 ruff check .       # lint
 ruff format .      # format
 mypy               # type-check
+python -m scripts.export_openapi   # after changing the API: update cve-frontend/openapi.json
 ```
 
 **Frontend** (http://localhost:5173):
@@ -127,6 +128,7 @@ npm run build      # type-checks, then builds for production
 npm run lint
 npm test           # unit tests; npm run test:watch keeps watching
 npm run format     # format with Prettier
+npm run gen:api    # regenerate src/api/schema.d.ts from openapi.json
 ```
 
 CI runs all of these checks on every pull request and every push to `main`.
@@ -205,9 +207,10 @@ cve-backend/
   pyproject.toml     ruff, mypy and pytest config
   tests/             pytest tests, with hand-written CIRCL fixtures in tests/fixtures/
 cve-frontend/
+  openapi.json       the API's schema, exported by cve-backend/scripts/export_openapi.py
   src/
     App.tsx          state and layout
-    api.ts           response types and fetch client
+    api/             typed API client; schema.d.ts is generated from ../openapi.json
     severity.ts      CVSS severity bands
     components/      TopBar, VendorSummary, ProductList, ProductDetail, CveTable, …
 docs/
