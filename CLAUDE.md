@@ -38,9 +38,9 @@ Dependabot (`.github/dependabot.yml`) opens weekly update PRs for pip, npm and G
 - **Backend layout** (`cve-backend/app/`):
   - `main.py`: `create_app(settings, circl=...)` wires middleware, routes and error handlers; the module-level `app` is what Vercel serves. State (the CIRCL client and `VendorService`) lives on `app.state`, and routes get it through the dependencies in `api/dependencies.py`.
   - `api/vendors.py`, `api/health.py`: routes. Every route declares a Pydantic `response_model` from `schemas.py`, so `/docs` and `/openapi.json` are exact.
-  - `clients/circl.py`: `CirclClient`, one shared `httpx.AsyncClient` with an 8 s timeout, 3 attempts with exponential backoff on 5xx, timeouts and connection errors, a semaphore of 8 concurrent requests and a `Spectra/...` User-Agent. It starts a new client if the event loop changes (some serverless runtimes and every `TestClient` use a new loop). Every failure raises `UpstreamError`.
-  - `services/vendor_service.py`: the lookup flow plus caching. `services/records.py`: pure functions over CIRCL payloads and CVE JSON 5 records (no I/O; test them directly).
-  - `cache.py`: `MemoryCache`, TTL plus LRU, per serverless instance. Entries outlive their TTL so stale copies can be served.
+  - `clients/circl.py`: `CirclClient` validates payload shapes at the boundary (vendor search returns typed `CirclVendor` entries) and uses one shared `httpx.AsyncClient` with an 8 s timeout, 3 attempts with exponential backoff on 5xx, timeouts and connection errors, a semaphore of 8 concurrent requests and a `Spectra/...` User-Agent. It starts a new client if the event loop changes (some serverless runtimes and every `TestClient` use a new loop). Every failure raises `UpstreamError`.
+  - `services/vendor_service.py`: the lookup flow only; it hands caching to `MemoryCache.get_or_load`. `services/records.py`: pure functions over CIRCL payloads and CVE JSON 5 records (no I/O; test them directly).
+  - `cache.py`: `MemoryCache.get_or_load(key, load)` owns the cache policy: a fresh hit, else `load()`, else (when `load` raises `UpstreamError`) the last good value as `Cached(value, stale=True)`. TTL plus LRU, per serverless instance. Callers never check freshness themselves.
   - `errors.py`: `VendorNotFoundError` → 404 and `UpstreamError` → 502, as `{"detail": ...}`.
   - `observability.py`: JSON logs to stdout, `X-Request-ID` (a safe incoming ID is reused) and `Server-Timing` (`app` total plus `circl` upstream time).
   - `config.py`: `Settings` (pydantic-settings) reads `ALLOWED_ORIGINS`, `ALLOWED_ORIGIN_REGEX`, `LOG_LEVEL` and `CIRCL_BASE_URL`.
@@ -54,7 +54,7 @@ Dependabot (`.github/dependabot.yml`) opens weekly update PRs for pip, npm and G
   2. lists the vendor's 15 most recently updated products (`/browse/vendors/{vendor}/products`);
   3. fetches `/vulnerability/search/{vendor}/{product}` for each product concurrently. A failed product is skipped; if all fail, it's an `UpstreamError`.
   - Records are in CVE JSON 5 format. The score comes from `containers.cna.metrics` (or the `adp` metrics) and prefers CVSS 3.1. `belongs_to_vendor` drops other vendors' CVEs, which the search sometimes returns. Display names come from `cna.affected[].product`.
-  - Results are cached for 10 minutes. After that, if CIRCL fails, the last good copy is served with `stale: true`; with nothing cached it's a 502. There's no sample data any more.
+  - Results are cached for 10 minutes. After that, if CIRCL fails, the last good copy is served with `stale: true`; with nothing cached it's a 502. Vendor suggestions get the same fallback (without a flag). There's no sample data any more.
 - **Frontend:** a single-screen master-detail dashboard. The top bar has vendor search plus presets, then a vendor summary, then the product list (left) and the selected product's CVE table (right).
   - `src/api/index.ts` holds `fetchVendor` (an `openapi-fetch` client for `GET /api/vendors/{vendor}`) and re-exports the response types from the generated `src/api/schema.d.ts`; never edit that file or `openapi.json` by hand. `fetchVendor` returns `null` for a 404 and throws a readable error otherwise. The base URL comes from `VITE_API_URL` and defaults to `http://localhost:8000`.
   - The vendor summary badge shows "Live" or, when the backend served its last good copy, "Cached" (`stale: true`).
