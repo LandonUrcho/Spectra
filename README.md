@@ -22,7 +22,7 @@ I wanted to build an app that showcases the vulnerabilities in products from the
 
 ```mermaid
 flowchart LR
-    B["Browser<br/>React + Vite SPA"] -- "GET /api/vendor/{name}" --> A["FastAPI<br/>Vercel Python function"]
+    B["Browser<br/>React + Vite SPA"] -- "GET /api/vendors/{name}" --> A["FastAPI<br/>Vercel Python function"]
     A -- "1. resolve vendor name" --> V["CIRCL<br/>/browse/vendors"]
     A -- "2. list recent products" --> P["CIRCL<br/>/browse/vendors/{v}/products"]
     A -- "3. fetch CVEs, 8 at a time" --> S["CIRCL<br/>/vulnerability/search/{v}/{p}"]
@@ -32,17 +32,20 @@ A lookup goes through four steps:
 
 1. **Resolve the vendor.** CIRCL keeps stale duplicate vendor entries, such as `palo alto` next to `palo alto networks`. The resolver prefers an exact or whole-word match and picks the most recently updated entry.
 2. **List products.** It takes the vendor's 15 most recently updated products.
-3. **Fetch CVEs in parallel.** It requests each product's CVEs concurrently, 8 at a time, with an 8-second timeout per request.
+3. **Fetch CVEs in parallel.** It requests each product's CVEs concurrently through one shared async HTTP client, 8 at a time, with an 8-second timeout per request. Failed requests (5xx, timeouts, dropped connections) are retried twice with exponential backoff. If one product's lookup still fails, the others are returned without it.
 4. **Normalize the records.** CVE JSON 5 records are inconsistent, so the backend cleans them up:
    - It reads the score from the CNA's metrics, falling back to ADP metrics. It prefers CVSS 3.1, then 3.0, 4.0 and 2.0.
    - It drops records for other vendors, which CIRCL's product search sometimes returns.
    - It names products using the record's own `affected[].product` value.
 
-Results are cached in memory for 10 minutes.
+Results are cached in memory for 10 minutes. If CIRCL is down after that, the API serves the last good copy marked `stale: true` instead of failing; with nothing cached, it returns `502`.
 
 ## Engineering notes
 
 - **Vendor resolution is generic.** No vendor needs special-case code: any vendor CIRCL knows about works.
+- **Errors are honest.** An unknown vendor is a `404`, CIRCL being down is a `502` (or stale data), and invalid input is a `422`. The API never passes off sample data as live.
+- **The API contract is typed.** Every route declares a Pydantic response model, so the OpenAPI schema at `/docs` is exact. The frontend will generate its types from it.
+- **Requests are traceable.** Every response carries an `X-Request-ID`, every log line is JSON tagged with that ID, and a `Server-Timing` header shows the total time and the time spent waiting on CIRCL in the browser's network panel.
 - **CORS is configured from the environment.** Exact origins come from `ALLOWED_ORIGINS`. Vercel preview URLs can be allowed through `ALLOWED_ORIGIN_REGEX`, which should be anchored on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex stops the app at startup instead of silently allowing nothing.
 - **Production builds fail loudly.** If `VITE_API_URL` isn't set, the app shows a clear "no API URL" error instead of quietly calling `localhost`.
 - **Theming uses design tokens.** Colors for surfaces, text and severity live in Tailwind v4's `@theme`, and components use them as utilities, never raw hex values.
@@ -60,7 +63,6 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 | Limitation | Planned fix |
 |---|---|
 | The cache lives in each serverless instance, so a cold instance refetches from CIRCL. | A shared Redis cache with request coalescing (PR 3) |
-| If CIRCL fails, the API returns bundled sample data with HTTP 200. The UI labels it "Sample data". | Real status codes (404, 502), and the last good result shown with a "stale" flag (PR 1) |
 | CVEs are ranked by CVSS severity only. | Priority from CISA KEV and FIRST EPSS exploitation data (PR 4) |
 | There are no URL routes, so views can't be bookmarked or shared. | React Router deep links and a CVE detail drawer (PRs 2 and 5) |
 | Each product shows at most 10 CVEs. | Pagination (PR 3) |
@@ -70,7 +72,7 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 [`docs/PLAN.md`](docs/PLAN.md) is the full upgrade plan, split into small PRs. Each one can be merged and deployed on its own, and each design decision lists the alternatives considered.
 
 - [x] **0. Tooling:** linting, formatting, starter tests, GitHub Actions CI
-- [ ] **1. Backend foundation:** modular FastAPI app, async HTTP, Pydantic models, honest errors, structured logging
+- [x] **1. Backend foundation:** modular FastAPI app, async HTTP, Pydantic models, honest errors, structured logging
 - [ ] **2. Frontend foundation:** React Router, TanStack Query, generated API types, app shell, light/dark themes
 - [ ] **3. Data layer:** Postgres (Neon), Redis (Upstash), stale-if-error caching, rate limits
 - [ ] **4. Risk prioritization:** CISA KEV and FIRST EPSS enrichment, P1–P4 priority, filters, CSV export
@@ -84,14 +86,14 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 | Layer | Tools |
 |---|---|
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, self-hosted Inter and JetBrains Mono |
-| Backend | Python, FastAPI, Uvicorn, Requests |
+| Backend | Python 3.11+, FastAPI, Pydantic and pydantic-settings, httpx, Uvicorn |
 | Data | CIRCL Vulnerability-Lookup API (CVE JSON 5 records) |
 | Hosting | Vercel: a static frontend plus a Python serverless function, both deployed from `main` |
 | Quality | ruff, mypy and pytest; ESLint, Prettier, and Vitest with Testing Library; GitHub Actions CI and Dependabot |
 
 ## Running locally
 
-You need Python 3.10 or newer and Node.js 22 or newer.
+You need Python 3.11 or newer and Node.js 22 or newer.
 
 **Backend** (http://localhost:8000; interactive docs at `/docs`):
 
@@ -135,17 +137,28 @@ CI runs all of these checks on every pull request and every push to `main`.
 |---|---|---|
 | `ALLOWED_ORIGINS` | backend | Comma-separated frontend origins allowed by CORS. `http://localhost:5173` is always allowed. |
 | `ALLOWED_ORIGIN_REGEX` | backend | Optional regex for Vercel preview URLs. Anchor it on your team slug. |
+| `LOG_LEVEL` | backend | Optional. `INFO` by default. |
+| `CIRCL_BASE_URL` | backend | Optional. Defaults to `https://vulnerability.circl.lu/api`. |
 | `VITE_API_URL` | frontend, at build time | The backend's base URL. Required for production builds. |
 
 [`.env.example`](.env.example) describes each one in more detail.
 
 ## API
 
-`GET /api/vendor/{vendor_name}` returns the vendor's top products and their latest CVEs:
+Interactive docs are at [`/docs`](https://cve-backend.vercel.app/docs).
+
+| Route | Returns |
+|---|---|
+| `GET /api/vendors/{vendor}` | The vendor's top products and their latest CVEs. `404` for an unknown vendor, `502` if CIRCL is down and nothing is cached, `422` for an invalid name. |
+| `GET /api/vendors?q=` | Vendor name suggestions for autocomplete. |
+| `GET /api/health` | Each dependency: whether it's configured and whether it answers. |
+| `GET /api/meta` | Feature flags for the frontend (AI, database, last ingest). All off for now. |
+| `GET /api/vendor/{vendor_name}` | Deprecated: the old response shape, kept until the frontend moves to `/api/vendors/{vendor}`. |
+
+`GET /api/vendors/palo alto`:
 
 ```json
 {
-  "status": "success",
   "vendor_label": "palo alto networks",
   "data": {
     "Cloud NGFW": [
@@ -157,14 +170,13 @@ CI runs all of these checks on every pull request and every push to `main`.
         "published": "2026-10-14"
       }
     ]
-  }
+  },
+  "stale": false,
+  "fetched_at": "2026-11-05T07:15:54.950908Z"
 }
 ```
 
-`status` takes one of three values:
-- `success`: live data from CIRCL;
-- `fallback`: bundled sample data, returned after an upstream error;
-- `offline_mode`: sample data because live mode is turned off.
+`stale` is `true` when CIRCL was unavailable and this is the last good copy; `fetched_at` says when it was fetched.
 
 ## Deployment
 
@@ -181,10 +193,17 @@ Every push to `main` deploys both projects.
 
 ```
 cve-backend/
-  main.py            FastAPI app: vendor resolution, CIRCL client, CVE normalization, cache
+  main.py            entry point for Vercel and `python main.py`
+  app/
+    main.py          app factory: middleware, routes, error handlers
+    config.py        settings from environment variables
+    api/             routes: vendors, health, meta
+    clients/circl.py async CIRCL client: retries, timeouts, concurrency limit
+    services/        vendor lookup and caching; CVE record parsing
+    observability.py JSON logs, request IDs, Server-Timing
   requirements.txt   pinned runtime dependencies (dev tools are in requirements-dev.txt)
   pyproject.toml     ruff, mypy and pytest config
-  tests/             pytest unit tests
+  tests/             pytest tests, with hand-written CIRCL fixtures in tests/fixtures/
 cve-frontend/
   src/
     App.tsx          state and layout
