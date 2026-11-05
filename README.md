@@ -49,6 +49,7 @@ Results are cached in memory for 10 minutes. If CIRCL is down after that, the AP
 - **Errors are honest.** An unknown vendor is a `404`, CIRCL being down is a `502` (or stale data), and invalid input is a `422`. The API never passes off sample data as live.
 - **The API contract is typed end to end.** Every route declares a Pydantic response model, so the OpenAPI schema is exact. The frontend's types are generated from that schema, and CI fails if the schema or the generated types fall out of date.
 - **Requests are traceable.** Every response carries an `X-Request-ID`, every log line is JSON tagged with that ID, and a `Server-Timing` header shows the total time and the time spent waiting on CIRCL in the browser's network panel.
+- **It's polite to CIRCL.** Concurrent requests for the same vendor share one upstream lookup instead of each fanning out to ~17 CIRCL calls, and each client IP gets 60 vendor requests a minute (then `429` with `Retry-After`).
 - **CORS is configured from the environment.** Exact origins come from `ALLOWED_ORIGINS`. Vercel preview URLs can be allowed through `ALLOWED_ORIGIN_REGEX`, which should be anchored on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex stops the app at startup instead of silently allowing nothing.
 - **Production builds fail loudly.** If `VITE_API_URL` isn't set, the app shows a clear "no API URL" error instead of quietly calling `localhost`.
 - **Theming uses design tokens.** Colors for surfaces, text and severity live in Tailwind v4's `@theme`, and components use them as utilities, never raw hex values.
@@ -143,6 +144,7 @@ CI runs all of these checks on every pull request and every push to `main`.
 |---|---|---|
 | `ALLOWED_ORIGINS` | backend | Comma-separated frontend origins allowed by CORS. `http://localhost:5173` is always allowed. |
 | `ALLOWED_ORIGIN_REGEX` | backend | Optional regex for Vercel preview URLs. Anchor it on your team slug. |
+| `RATE_LIMIT_PER_MINUTE` | backend | Optional. Vendor requests per minute per client IP; `60` by default, `0` turns it off. |
 | `LOG_LEVEL` | backend | Optional. `INFO` by default. |
 | `CIRCL_BASE_URL` | backend | Optional. Defaults to `https://vulnerability.circl.lu/api`. |
 | `VITE_API_URL` | frontend, at build time | The backend's base URL. Required for production builds. |
