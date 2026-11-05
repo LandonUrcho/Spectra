@@ -16,6 +16,7 @@ I wanted to build an app that showcases the vulnerabilities in products from the
 - **See the products with recent CVEs first.** It checks the vendor's most recently updated products and shows those with the most CVEs, each with a severity bar.
 - **Read a product's CVEs.** Each CVE shows its CVSS score and version, publish date and description. The table sorts by score or date, and descriptions expand in place. Every CVE ID links to its full record on CIRCL.
 - **Get the summary at a glance.** The page shows the number of products and CVEs, how many are critical, and the highest CVSS score.
+- **Share what you're looking at.** Every vendor and product has its own URL (`/vendors/cisco/IOS XE`), so views can be bookmarked and shared, and the back button works.
 - **Use it from the keyboard.** `/` focuses search, the arrow keys move through the product list, and the table headers support screen readers.
 
 ## How it works
@@ -64,7 +65,7 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 |---|---|
 | The cache lives in each serverless instance, so a cold instance refetches from CIRCL. | A shared Redis cache with request coalescing (PR 3) |
 | CVEs are ranked by CVSS severity only. | Priority from CISA KEV and FIRST EPSS exploitation data (PR 4) |
-| There are no URL routes, so views can't be bookmarked or shared. | React Router deep links and a CVE detail drawer (PRs 2 and 5) |
+| CVEs don't have pages of their own. | A CVE detail drawer with its own URL (PR 5) |
 | Each product shows at most 10 CVEs. | Pagination (PR 3) |
 
 ## Roadmap
@@ -85,7 +86,7 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 
 | Layer | Tools |
 |---|---|
-| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, self-hosted Inter and JetBrains Mono |
+| Frontend | React 19, TypeScript, Vite 8, React Router, TanStack Query, Tailwind CSS v4, self-hosted Inter and JetBrains Mono |
 | Backend | Python 3.11+, FastAPI, Pydantic and pydantic-settings, httpx, Uvicorn |
 | Data | CIRCL Vulnerability-Lookup API (CVE JSON 5 records) |
 | Hosting | Vercel: a static frontend plus a Python serverless function, both deployed from `main` |
@@ -187,7 +188,7 @@ The app runs as two Vercel projects from this one repository:
 | Project | Root directory | Settings |
 |---|---|---|
 | Backend | `cve-backend` | Vercel detects the FastAPI `app` in `main.py`. Set `ALLOWED_ORIGINS` to the frontend URL. |
-| Frontend | `cve-frontend` | Use the Vite preset. Set `VITE_API_URL` to the backend URL, then redeploy after changing it, because the value is baked in at build time. |
+| Frontend | `cve-frontend` | Use the Vite preset. Set `VITE_API_URL` to the backend URL, then redeploy after changing it, because the value is baked in at build time. `vercel.json` sends every path to `index.html` so deep links work. |
 
 Every push to `main` deploys both projects.
 
@@ -209,7 +210,8 @@ cve-backend/
 cve-frontend/
   openapi.json       the API's schema, exported by cve-backend/scripts/export_openapi.py
   src/
-    App.tsx          state and layout
+    routes.tsx       URL routes; Layout.tsx is the shared frame
+    pages/           the vendor dashboard, not-found and error pages
     api/             typed API client; schema.d.ts is generated from ../openapi.json
     severity.ts      CVSS severity bands
     components/      TopBar, VendorSummary, ProductList, ProductDetail, CveTable, …
