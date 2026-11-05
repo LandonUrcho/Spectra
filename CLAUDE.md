@@ -39,9 +39,11 @@ Dependabot (`.github/dependabot.yml`) opens weekly update PRs for pip, npm and G
   - `clients/circl.py`: `CirclClient`, one shared `httpx.AsyncClient` with an 8 s timeout, 3 attempts with exponential backoff on 5xx, timeouts and connection errors, a semaphore of 8 concurrent requests and a `Spectra/...` User-Agent. It starts a new client if the event loop changes (some serverless runtimes and every `TestClient` use a new loop). Every failure raises `UpstreamError`.
   - `services/vendor_service.py`: the lookup flow plus caching. `services/records.py`: pure functions over CIRCL payloads and CVE JSON 5 records (no I/O; test them directly).
   - `cache.py`: `MemoryCache`, TTL plus LRU, per serverless instance. Entries outlive their TTL so stale copies can be served.
-  - `errors.py`: `VendorNotFoundError` → 404 and `UpstreamError` → 502, as `{"detail": ...}`.
+  - `VendorService` coalesces concurrent lookups of one vendor into a single CIRCL fan-out (a shared, shielded future per vendor).
+  - `ratelimit.py`: a sliding-window limiter per client IP (first `X-Forwarded-For` hop), applied to every route in `api/vendors.py` as a router dependency; over the limit is a 429 with `Retry-After`. `RATE_LIMIT_PER_MINUTE` (default 60, 0 = off). It's per instance until the Redis store in roadmap PR 3.
+  - `errors.py`: `VendorNotFoundError` → 404, `RateLimitedError` → 429 and `UpstreamError` → 502, as `{"detail": ...}`.
   - `observability.py`: JSON logs to stdout, `X-Request-ID` (a safe incoming ID is reused) and `Server-Timing` (`app` total plus `circl` upstream time).
-  - `config.py`: `Settings` (pydantic-settings) reads `ALLOWED_ORIGINS`, `ALLOWED_ORIGIN_REGEX`, `LOG_LEVEL` and `CIRCL_BASE_URL`.
+  - `config.py`: `Settings` (pydantic-settings) reads `ALLOWED_ORIGINS`, `ALLOWED_ORIGIN_REGEX`, `RATE_LIMIT_PER_MINUTE`, `LOG_LEVEL` and `CIRCL_BASE_URL`.
 - **Routes:**
   - `GET /api/vendors/{vendor}` returns `{vendor_label, data, stale, fetched_at}`. `data` has the shape `{ [productName]: [{id, summary, score, cvss_version, published}] }`, products with the most CVEs first.
   - `GET /api/vendors?q=` returns `{query, vendors}` for autocomplete. `GET /api/health` reports each dependency; `GET /api/meta` returns feature flags (all off until later phases).
