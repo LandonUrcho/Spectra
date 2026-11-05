@@ -65,6 +65,8 @@ Dependabot (`.github/dependabot.yml`) opens weekly update PRs for pip, npm and G
   - `src/severity.ts` defines the CVSS bands and their colors.
   - `src/components/` holds the presentational pieces.
   - Design tokens (surfaces, text, accent, severity colors) live in `@theme` in `src/index.css`. Use them as utilities (`bg-surface`, `border-line`, `text-muted`) instead of raw hex values.
+  - Light and dark themes: `:root[data-theme="light"]` in `index.css` redefines every token, so components need no theme logic. Add any new token to both sets, and keep text colors at 4.5:1 contrast or better on every surface. An inline script in `index.html` sets `data-theme` before the first paint (saved choice, else the system preference); `src/theme.ts` (`useTheme`) and `components/ThemeToggle.tsx` switch and save it under `localStorage["spectra-theme"]`.
+  - `Layout.tsx` starts with a "Skip to content" link to `<main id="main">`.
   - The style is deliberately restrained: no glows, gradients, animations or uppercase tracking.
 - **CORS:** `http://localhost:5173` is always allowed, and `GET` and `POST` are allowed methods (POST is for the AI explainer in roadmap PR 6). `X-Request-ID` is exposed to the browser. Deployed frontends go in the `ALLOWED_ORIGINS` env var (comma-separated exact origins, lowercased and trailing slashes stripped). `ALLOWED_ORIGIN_REGEX` can match Vercel preview URLs; anchor it on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex makes the app refuse to start with a clear error.
 - `cve-backend/venv/`, `.venv/`, `__pycache__/`, `server.*.log` and the tool caches (`.coverage`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`) are gitignored local files, not source.
