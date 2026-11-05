@@ -45,8 +45,8 @@ Results are cached in memory for 10 minutes. If CIRCL is down after that, the AP
 - **Vendor resolution is generic.** No vendor needs special-case code: any vendor CIRCL knows about works.
 - **Errors are honest.** An unknown vendor is a `404`, CIRCL being down is a `502` (or stale data), and invalid input is a `422`. The API never passes off sample data as live.
 - **The API contract is typed.** Every route declares a Pydantic response model, so the OpenAPI schema at `/docs` is exact. The frontend will generate its types from it.
-- **It's polite to CIRCL.** Concurrent requests for the same vendor share one upstream lookup instead of each fanning out to ~17 CIRCL calls, and each client IP gets 60 vendor requests a minute (then `429` with `Retry-After`).
 - **Requests are traceable.** Every response carries an `X-Request-ID`, every log line is JSON tagged with that ID, and a `Server-Timing` header shows the total time and the time spent waiting on CIRCL in the browser's network panel.
+- **It's polite to CIRCL.** Concurrent requests for the same vendor share one upstream lookup instead of each fanning out to ~17 CIRCL calls, and each client IP gets 60 vendor requests a minute (then `429` with `Retry-After`).
 - **CORS is configured from the environment.** Exact origins come from `ALLOWED_ORIGINS`. Vercel preview URLs can be allowed through `ALLOWED_ORIGIN_REGEX`, which should be anchored on the team slug, because anyone can claim a `spectra-*.vercel.app` name. An invalid regex stops the app at startup instead of silently allowing nothing.
 - **Production builds fail loudly.** If `VITE_API_URL` isn't set, the app shows a clear "no API URL" error instead of quietly calling `localhost`.
 - **Theming uses design tokens.** Colors for surfaces, text and severity live in Tailwind v4's `@theme`, and components use them as utilities, never raw hex values.
