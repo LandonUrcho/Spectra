@@ -17,8 +17,9 @@ I wanted to build an app that showcases the vulnerabilities in products from the
 - **Read a product's CVEs.** Each CVE shows its CVSS score and version, publish date and description. The table sorts by score or date, and descriptions expand in place. Every CVE ID links to its full record on CIRCL.
 - **Get the summary at a glance.** The page shows the number of products and CVEs, how many are critical, and the highest CVSS score.
 - **Share what you're looking at.** Every vendor and product has its own URL (`/vendors/cisco/IOS XE`), so views can be bookmarked and shared, and the back button works.
+- **See how it works.** The Methodology page explains where the data comes from, how severity is graded, and what CVSS doesn't tell you.
 - **Light or dark.** It follows your system theme, and the toggle in the top bar remembers your choice.
-- **Use it from the keyboard.** `/` focuses search, the arrow keys move through the product list, and the table headers support screen readers.
+- **Use it from the keyboard.** `/` or `⌘K` focuses search, the arrow keys move through the product list, and the table headers support screen readers.
 
 ## How it works
 
@@ -213,7 +214,7 @@ cve-frontend/
   openapi.json       the API's schema, exported by cve-backend/scripts/export_openapi.py
   src/
     routes.tsx       URL routes; Layout.tsx is the shared frame
-    pages/           the vendor dashboard, not-found and error pages
+    pages/           vendor dashboard, methodology, watchlist, not-found and error pages
     api/             typed API client; schema.d.ts is generated from ../openapi.json
     severity.ts      CVSS severity bands
     components/      TopBar, VendorSummary, ProductList, ProductDetail, CveTable, …
