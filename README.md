@@ -93,7 +93,7 @@ These are known gaps, and each one is scheduled in the [roadmap](docs/PLAN.md):
 | Backend | Python 3.11+, FastAPI, Pydantic and pydantic-settings, httpx, Uvicorn |
 | Data | CIRCL Vulnerability-Lookup API (CVE JSON 5 records) |
 | Hosting | Vercel: a static frontend plus a Python serverless function, both deployed from `main` |
-| Quality | ruff, mypy and pytest; ESLint, Prettier, and Vitest with Testing Library; GitHub Actions CI and Dependabot |
+| Quality | ruff, mypy (strict), pytest and respx; ESLint, Prettier, Vitest, Testing Library and MSW; GitHub Actions CI and Dependabot |
 
 ## Running locally
 

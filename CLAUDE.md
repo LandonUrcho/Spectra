@@ -10,7 +10,7 @@ Spectra is a CVE dashboard. Pick a vendor (e.g. Cisco, VMware, Palo Alto) and it
 
 Tests never touch the network:
 - Backend tests live in `cve-backend/tests/` (pytest). `respx` intercepts every request to CIRCL, and `tests/fixtures/` holds hand-written CIRCL responses. `conftest.py` builds a fresh app per test with `create_app()`, a `CirclClient` without backoff delays, and a fake clock for cache expiry. Async tests use the anyio pytest plugin (`pytestmark = pytest.mark.anyio`). Warnings fail the tests.
-- Frontend tests sit next to the source as `*.test.ts(x)` (Vitest, Testing Library, jsdom). `src/test/setup.ts` unmounts rendered components after each test. Tests stub `fetch` with `vi.stubGlobal`; `src/routes.test.tsx` renders the real routes in a memory router with a fresh `QueryClient` (no retries).
+- Frontend tests sit next to the source as `*.test.ts(x)` (Vitest, Testing Library, jsdom). `src/test/setup.ts` unmounts rendered components after each test. API calls are answered by MSW: `src/test/handlers.ts` holds the default handlers and fixtures (`palo alto` and `cisco` exist, other vendors 404), `src/test/setup.ts` starts the server, and any request without a handler fails the test. Override a response for one test with `server.use(http.get(...))`. `src/routes.test.tsx` renders the real routes in a memory router with a fresh `QueryClient` (no retries).
 
 ## Commands
 Backend (from `cve-backend/`):
